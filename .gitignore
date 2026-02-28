@@ -1,5 +1,5 @@
 .env
 .venv/
 __pycache__/
-screenshot_final.png
-temp_download/
+comprovantes/
+screenshots/

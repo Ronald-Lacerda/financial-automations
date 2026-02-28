@@ -27,12 +27,16 @@ async def run_condo_automation(url_file_comprovante: str, webhook_url: str):
     """
     user = os.getenv("GONZAGA_USER")
     pw = os.getenv("GONZAGA_PASS")
-    waha_api_key = os.getenv("WAHA_API_KEY")  # Carrega a chave da API do .env
+    waha_api_key = os.getenv("WAHA_API_KEY")
     
-    # Cria um diretório temporário para o download
-    temp_dir = Path(f"./temp_download")
-    temp_dir.mkdir(exist_ok=True)
+    # Cria um diretório os comprovantes baixados
+    comprov_dir = Path(f"./comprovantes")
+    comprov_dir.mkdir(exist_ok=True)
     local_file_path = ""
+
+    # Cria diretório para Screenshots
+    screenshot_dir = Path(f"./screenshots")
+    screenshot_dir.mkdir(exist_ok=True)
 
     # --- Bloco de Download ---
     try:
@@ -55,7 +59,7 @@ async def run_condo_automation(url_file_comprovante: str, webhook_url: str):
                 return
 
             file_extension = Path(url_file_comprovante).suffix or '.jpeg'
-            local_file_path = temp_dir / f"comprovante_{uuid.uuid4()}{file_extension}"
+            local_file_path = comprov_dir / f"comprovante_{uuid.uuid4()}{file_extension}"
             with open(local_file_path, "wb") as f:
                 f.write(response.content)
             print(f"LOG: ✅ Arquivo salvo em: {local_file_path}")
@@ -68,7 +72,7 @@ async def run_condo_automation(url_file_comprovante: str, webhook_url: str):
 
     # --- Bloco de Automação com Playwright ---
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True, slow_mo=500)
+        browser = await p.chromium.launch(headless=True, slow_mo=500, args=["--no-sandbox", "--disable-setuid-sandbox"])
         page = await browser.new_page()
         
         try:
@@ -103,7 +107,8 @@ async def run_condo_automation(url_file_comprovante: str, webhook_url: str):
             await page.set_input_files('input#file', local_file_path)
             await page.wait_for_timeout(2000) 
 
-            await page.screenshot(path="screenshot_final.png", full_page=True)
+            screenshot_name = f"ticket_preenchido-{uuid.uuid4()}.png"
+            await page.screenshot(path=screenshot_dir / screenshot_name)
             print("LOG: ✅ Ticket preenchido e anexo enviado!")
             
             # await send_webhook_notification(webhook_url, "Automação de ticket concluída com sucesso.", success=True)
@@ -115,14 +120,3 @@ async def run_condo_automation(url_file_comprovante: str, webhook_url: str):
             #await send_webhook_notification(webhook_url, error_msg)
         finally:
             await browser.close()
-            # Limpeza final dos arquivos temporários
-            # try:
-            #     if local_file_path and Path(local_file_path).exists():
-            #         os.remove(local_file_path)
-            #     if temp_dir.exists():
-            #         # shutil.rmtree para remover diretório e conteúdo
-            #         import shutil
-            #         shutil.rmtree(temp_dir)
-            #     print("LOG: 🧹 Limpeza de arquivos temporários concluída.")
-            # except Exception as e:
-            #     print(f"LOG: ⚠️ Erro durante a limpeza de arquivos: {e}")
